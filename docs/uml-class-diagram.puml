@@ -1,0 +1,574 @@
+' Payanam Rail – UML class diagrams (PlantUML)
+' Render: java -jar plantuml.jar (no Graphviz needed: class/component diagrams use the built-in smetana layout)
+'        e.g. java -jar plantuml.jar docs/uml-class-diagram.puml   (or paste into https://www.plantuml.com/plantuml)
+' The same model in Mermaid: uml-class-diagram.md
+
+@startuml payanam-domain
+!pragma layout smetana
+title Payanam Rail – core domain (trains, reservations, platforms)
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+hide empty members
+
+package "domain.engine" {
+  class RailwayStation {
+    - name : String
+    - clock : SimulationClock
+    - log : EventLog
+    - registry : TrainRegistry
+    - desk : ReservationDesk
+    - scheduler : PlatformScheduler
+    + book(ownerUserId, ownerName, trainNo, people) : Booking
+    + cancelBooking(pnr, actorUserId, staffOverride) : List<CancellationOutcome>
+    + cancelPassenger(pnr, passengerNo, actorUserId, staffOverride) : CancellationOutcome
+    + requestPlatform(trainNo, ArrivalType) : AllocationResult
+    + confirmArrival(trainNo) : TrainService
+    + confirmDeparture(trainNo) : DepartureResult
+    + reportDelay(trainNo, minutes, reason) : DelayImpact
+    + setMaintenance(platformId, on) : OperationResult
+    + advanceClock(minutes) : List<String>
+    + setPolicy(PlatformAllocationPolicy)
+    + copy() : RailwayStation
+  }
+
+  class TrainRegistry {
+    + {static} MAX_TRAINS : int = 6
+    - trains : HashMap<String, TrainService>
+    - timetable : ArrayList<TrainService>  <<sorted>>
+    + add(TrainService)
+    + get(trainNo) : TrainService
+    + delay(TrainService, minutes, reason)
+    + reschedule(TrainService, arrival, departure, Priority)
+    + timetable() : List<TrainService>
+  }
+
+  class ReservationDesk {
+    - bookingsByPnr : HashMap<String, Booking>
+    - passengersById : HashMap<String, Passenger>
+    - pnrsByOwner : HashMap<Long, List<String>>
+    - history : ArrayList<Booking>  <<sorted>>
+    + book(ownerUserId, ownerName, trainNo, people, when) : Booking
+    + cancelBooking(pnr, actorUserId, staffOverride, when) : List<CancellationOutcome>
+    + cancelPassenger(pnr, passengerNo, actorUserId, staffOverride, when) : CancellationOutcome
+    + find(pnr) : Booking
+    + findOwned(pnr, ownerUserId) : Booking
+    + bookingsOf(ownerUserId) : List<Booking>
+    + history() : List<Booking>
+  }
+
+  class PlatformScheduler {
+    + {static} MAX_DELAY_MINUTES : int = 720
+    - policy : PlatformAllocationPolicy
+    - clearanceBufferMinutes : int
+    - platforms : HashMap<String, Platform>
+    - waitingQueue : PriorityQueue<PlatformRequest>
+    - releaseHeap : PriorityQueue<PlatformRelease>  <<min-heap>>
+    - activeRequests : HashMap<String, PlatformRequest>
+    + requestPlatform(trainNo, ArrivalType) : AllocationResult
+    + confirmArrival(trainNo) : TrainService
+    + confirmDeparture(trainNo) : DepartureResult
+    + reportDelay(trainNo, minutes, reason) : DelayImpact
+    + setMaintenance(platformId, on) : OperationResult
+    + changePlatformLength(platformId, length) : OperationResult
+    + advanceClock(minutes) : List<String>
+    + queueInOrder() : List<PlatformRequest>
+    + earliestCompatibleRelease(TrainService) : Optional<PlatformRelease>
+    - tryAllocate(PlatformRequest) : boolean
+    ~ processQueue() : List<AllocationResult>
+    ~ applyDelay(train, minutes, reason, reallocate) : DelayImpact
+  }
+
+  class SimulationClock {
+    - start : LocalDateTime
+    - now : LocalDateTime
+    - running : boolean
+    + advance(minutes) : LocalDateTime
+    + reset()
+    + now() : LocalDateTime
+  }
+
+  class EventLog {
+    - events : ArrayList<StationEvent>  <<sorted>>
+    + record(time, category, alert, trainNo, message) : StationEvent
+    + since(sequence) : List<StationEvent>
+  }
+
+  interface StationListener {
+    + onPromotion(PromotionNotice)
+    + onTrainUpdate(TrainUpdateNotice)
+  }
+}
+
+package "domain.model" {
+  class TrainService {
+    + {static} CAPACITY : int = 10
+    - trainNo : String
+    - name : String
+    - origin : String
+    - destination : String
+    - lengthMeters : int
+    - fare : BigDecimal
+    - scheduledArrival : LocalDateTime
+    - scheduledDeparture : LocalDateTime
+    - expectedArrival : LocalDateTime
+    - expectedDeparture : LocalDateTime
+    - declaredPriority : Priority
+    - status : TrainStatus
+    - platformId : String
+    - delayMinutes : int
+    - seats : Reservation[10]
+    - confirmedCount : int
+    - waitingList : ArrayDeque<Reservation>
+    + bookSeat(Reservation, when) : ReservationStatus
+    + cancelBooking(Reservation, when) : CancellationOutcome
+    + applyDelay(minutes, reason)
+    + reschedule(arrival, departure, Priority)
+    + markWaiting()
+    + assignPlatform(platformId)
+    + markArrived(when)
+    + markDeparted(when)
+    + markRejected()
+    - lowestFreeSeat() : int
+    - incrementConfirmed()
+    - decrementConfirmed()
+  }
+
+  class Reservation {
+    - id : String
+    - pnr : String
+    - trainNo : String
+    - bookedAt : LocalDateTime
+    - status : ReservationStatus
+    - seatNo : Integer
+    - waitingPosition : int
+    - promoted : boolean
+    - timeline : List<StatusChange>
+    ~ confirm(seat, when)
+    ~ waitlist(position, when)
+    ~ promote(seat, when)
+    ~ moveInQueue(position, when)
+    ~ cancel(when)
+    + getStatusLabel() : String
+    + isActive() : boolean
+  }
+
+  class Passenger <<record>> {
+    + id : String
+    + name : String
+    + age : int
+    + gender : Gender
+  }
+
+  class StatusChange <<record>> {
+    + at : LocalDateTime
+    + label : String
+    + note : String
+  }
+
+  class Booking {
+    - pnr : String
+    - ownerUserId : Long
+    - ownerName : String
+    - trainNo : String
+    - bookedAt : LocalDateTime
+    - farePerPassenger : BigDecimal
+    - reservations : List<Reservation>
+    + isOwnedBy(userId) : boolean
+    + passenger(passengerNo) : Reservation
+    + activeReservations() : List<Reservation>
+    + isFullyCancelled() : boolean
+    + totalFare() : BigDecimal
+  }
+
+  class Platform {
+    - id : String
+    - name : String
+    - lengthMeters : int
+    - underMaintenance : boolean
+    - occupations : ArrayList<OccupationInterval>  <<sorted by start>>
+    + canFit(trainLength) : boolean
+    + isAvailableForAllocation() : boolean
+    + isFree(start, end) : boolean
+    + occupyPlatform(trainNo, start, end, trainLength)
+    + replaceOccupation(trainNo, start, end)
+    + reoccupy(trainNo, start, end)
+    + removeOccupation(trainNo) : Optional<OccupationInterval>
+    + findOverlapping(start, end) : List<OccupationInterval>
+    + nextFreeTime(now) : LocalDateTime
+    + setUnderMaintenance(on)
+    + changeLength(newLength, longestTrainUsingIt)
+  }
+
+  class OccupationInterval <<record>> {
+    + trainNo : String
+    + start : LocalDateTime
+    + end : LocalDateTime
+    + overlaps(otherStart, otherEnd) : boolean
+    + contains(time) : boolean
+  }
+
+  class PlatformRelease <<record>> {
+    + platformId : String
+    + trainNo : String
+    + releaseTime : LocalDateTime
+    + compareTo(PlatformRelease) : int
+  }
+
+  abstract class PlatformRequest {
+    + {static} QUEUE_ORDER : Comparator<PlatformRequest>
+    - train : TrainService
+    - requestedAt : LocalDateTime
+    + {abstract} priorityRank() : int
+    + {abstract} getType() : ArrivalType
+    + {static} create(ArrivalType, TrainService, requestedAt) : PlatformRequest
+    + getArrivalTime() : LocalDateTime
+  }
+  class EmergencyArrival {
+    + priorityRank() : int  // 0
+  }
+  class ConnectionArrival {
+    + priorityRank() : int  // 1
+  }
+  class ScheduledArrival {
+    + priorityRank() : int  // 2
+  }
+
+  class SortedLists <<utility>> {
+    + {static} upperBound(list, key, order) : int
+    + {static} insertSorted(list, item, order) : int
+  }
+
+  enum Priority {
+    EMERGENCY
+    CONNECTION
+    NORMAL
+    + rank() : int
+  }
+  enum ArrivalType {
+    EMERGENCY
+    CONNECTION
+    SCHEDULED
+  }
+  enum TrainStatus {
+    SCHEDULED
+    WAITING_FOR_PLATFORM
+    PLATFORM_ASSIGNED
+    ARRIVED
+    DEPARTED
+    REJECTED
+    + bookingOpen() : boolean
+  }
+  enum ReservationStatus {
+    CNF
+    WL
+    CAN
+  }
+  enum PlatformStatus {
+    FREE
+    OCCUPIED
+    MAINTENANCE
+  }
+  enum Gender {
+    MALE
+    FEMALE
+    OTHER
+  }
+}
+
+package "domain.policy" {
+  interface PlatformAllocationPolicy {
+    + selectPlatform(train, start, end, platforms) : Optional<Platform>
+    + type() : AllocationPolicyType
+    + {static} isValid(platform, train, start, end) : boolean
+  }
+  class BestFitAllocationPolicy {
+    + selectPlatform(...) : Optional<Platform>
+  }
+  class FirstFitAllocationPolicy {
+    + selectPlatform(...) : Optional<Platform>
+  }
+  enum AllocationPolicyType {
+    BEST_FIT
+    FIRST_FIT
+    + create() : PlatformAllocationPolicy
+  }
+}
+
+RailwayStation *-- SimulationClock
+RailwayStation *-- EventLog
+RailwayStation *-- TrainRegistry
+RailwayStation *-- ReservationDesk
+RailwayStation *-- PlatformScheduler
+RailwayStation --> StationListener : notifies
+
+TrainRegistry o-- "0..6" TrainService
+TrainService *-- "0..10\nseats" Reservation
+TrainService *-- "0..*\nwaitingList (FIFO)" Reservation
+TrainService --> Priority
+TrainService --> TrainStatus
+
+Reservation --> "1" Passenger
+Reservation *-- "1..*" StatusChange
+Reservation --> ReservationStatus
+Booking o-- "1..4" Reservation
+ReservationDesk o-- "0..*" Booking
+ReservationDesk --> TrainRegistry
+ReservationDesk --> EventLog
+
+PlatformScheduler o-- "3" Platform
+PlatformScheduler o-- "0..*" PlatformRequest : waitingQueue
+PlatformScheduler *-- "0..*" PlatformRelease : releaseHeap
+PlatformScheduler --> PlatformAllocationPolicy : strategy
+PlatformScheduler --> TrainRegistry
+PlatformScheduler --> SimulationClock
+PlatformScheduler ..> PlatformStatus
+Platform *-- "0..*" OccupationInterval
+Platform ..> SortedLists
+TrainRegistry ..> SortedLists
+EventLog ..> SortedLists
+
+PlatformRequest <|-- EmergencyArrival
+PlatformRequest <|-- ConnectionArrival
+PlatformRequest <|-- ScheduledArrival
+PlatformRequest --> "1" TrainService
+PlatformRequest ..> ArrivalType
+
+PlatformAllocationPolicy <|.. BestFitAllocationPolicy
+PlatformAllocationPolicy <|.. FirstFitAllocationPolicy
+PlatformAllocationPolicy ..> Platform : chooses
+AllocationPolicyType ..> PlatformAllocationPolicy : creates
+@enduml
+
+@startuml payanam-users
+!pragma layout smetana
+title Payanam Rail – users, roles and security
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+hide empty members
+
+abstract class UserAccount <<entity>> {
+  - id : Long
+  - fullName : String
+  - email : String
+  - mobile : String
+  - passwordHash : String
+  - failedLoginAttempts : int
+  - lockedUntil : LocalDateTime
+  - lastLoginAt : LocalDateTime
+  + {abstract} getRole() : Role
+  + {abstract} getPermissions() : Set<Permission>
+  + {abstract} getDisplayTitle() : String
+  + hasPermission(Permission) : boolean
+  + isLocked(now) : boolean
+  + registerFailedLogin(now, maxAttempts, lockMinutes) : int
+  + registerSuccessfulLogin(now)
+  + changePasswordHash(hash)
+  + updateContact(name, mobile)
+}
+class PassengerUser <<entity>> {
+  - dateOfBirth : LocalDate
+  - gender : Gender
+  - city : String
+  + getRole() : Role  // PASSENGER
+  + getPermissions() : Set<Permission>  // empty
+  + updateCity(city)
+}
+class StationStaffUser <<entity>> {
+  - employeeId : String
+  - designation : StaffDesignation
+  + getRole() : Role  // STATION_STAFF
+  + getPermissions() : Set<Permission>  // designation.permissions()
+}
+enum Role {
+  PASSENGER
+  STATION_STAFF
+}
+enum StaffDesignation {
+  STATION_MASTER
+  PLATFORM_CONTROLLER
+  BOOKING_CLERK
+  + title() : String
+  + permissions() : Set<Permission>
+}
+enum Permission {
+  VIEW_DASHBOARD
+  MANAGE_PLATFORMS
+  MANAGE_TRAINS
+  MANAGE_RESERVATIONS
+  CONTROL_SIMULATION
+  VIEW_AUDIT
+  RUN_TESTS
+  MANAGE_SETTINGS
+}
+class AuthSession <<entity>> {
+  - id : String  // = JWT jti
+  - userId : Long
+  - issuedAt : LocalDateTime
+  - expiresAt : LocalDateTime
+  - revokedAt : LocalDateTime
+  - rememberMe : boolean
+  + isActive(now) : boolean
+  + revoke(now)
+}
+class PasswordResetRequest <<entity>> {
+  - userId : Long
+  - otpHash : String
+  - expiresAt : LocalDateTime
+  - attempts : int
+  - used : boolean
+}
+class AuditLogEntry <<entity>> {
+  - timestamp : LocalDateTime
+  - simulationTime : LocalDateTime
+  - actor : String
+  - role : String
+  - action : String
+  - details : String
+  - success : boolean
+}
+class StationSnapshot <<entity>> {
+  - label : String
+  - simulationTime : LocalDateTime
+  - summaryJson : String
+  - createdBy : String
+}
+class JwtService {
+  + createToken(AuthUser, issuedAt, expiresAt) : String
+  + parse(token) : Optional<AuthUser>
+}
+class JwtAuthenticationFilter {
+  # doFilterInternal(request, response, chain)
+}
+class AuthUser <<record>> {
+  + id : Long
+  + email : String
+  + fullName : String
+  + role : Role
+  + designation : String
+  + permissions : Set<Permission>
+  + sessionId : String
+  + authorities() : List<GrantedAuthority>
+}
+
+UserAccount <|-- PassengerUser
+UserAccount <|-- StationStaffUser
+UserAccount ..> Role
+StationStaffUser --> StaffDesignation
+StaffDesignation --> "1..*" Permission
+AuthSession --> UserAccount : userId
+PasswordResetRequest --> UserAccount : userId
+JwtAuthenticationFilter --> JwtService
+JwtAuthenticationFilter --> AuthSession : checks not revoked
+JwtAuthenticationFilter ..> AuthUser : creates principal
+note bottom of UserAccount : JPA single-table inheritance\n(account_type = PASSENGER | STAFF)
+@enduml
+
+@startuml payanam-exceptions
+!pragma layout smetana
+title Payanam Rail – exceptions and HTTP mapping
+skinparam shadowing false
+hide empty members
+class RuntimeException
+abstract class RailwayException {
+  - code : String
+  + getCode() : String
+}
+RuntimeException <|-- RailwayException
+RailwayException <|-- TrainNotFoundException : 404 TRAIN_NOT_FOUND
+RailwayException <|-- ReservationNotFoundException : 404 PNR_NOT_FOUND
+RailwayException <|-- SeatUnavailableException : 409 SEAT_UNAVAILABLE
+RailwayException <|-- InvalidCancellationException : 409 INVALID_CANCELLATION
+RailwayException <|-- PlatformConflictException : 409 PLATFORM_CONFLICT
+RailwayException <|-- InvalidOperationException : 409 INVALID_OPERATION
+RailwayException <|-- UnauthorizedActionException : 403 UNAUTHORIZED_ACTION
+RailwayException <|-- AuthenticationFailedException : 401 AUTH_FAILED
+RailwayException <|-- AccountLockedException : 423 ACCOUNT_LOCKED
+RailwayException <|-- ValidationException : 400 VALIDATION_FAILED
+class GlobalExceptionHandler <<RestControllerAdvice>> {
+  + railway(RailwayException) : ResponseEntity<ApiError>
+  + invalid(MethodArgumentNotValidException) : ResponseEntity<ApiError>
+  + denied(AccessDeniedException) : ResponseEntity<ApiError>
+}
+GlobalExceptionHandler ..> RailwayException
+@enduml
+
+@startuml payanam-layers
+!pragma layout smetana
+title Payanam Rail – controllers, services and repositories
+skinparam shadowing false
+hide empty members
+left to right direction
+
+package controller {
+  class AuthController
+  class TrainController
+  class BookingController
+  class PnrController
+  class NotificationController
+  class PlatformController
+  class OperationsController
+  class StaffReservationController
+  class SimulationController
+  class AuditController
+  class AdminController
+  class TestLabController
+}
+package service {
+  class AuthService
+  class TimetableService
+  class BookingService
+  class NotificationService
+  class OperationsService
+  class StaffReservationService
+  class DashboardService
+  class SimulationService
+  class AuditService
+  class TestScenarioService
+  class StationService {
+    - station : RailwayStation  <<volatile>>
+    + read(fn) : T
+    + write(fn) : T
+    + preview(fn) : T
+    + loadSeed()
+    + resetEmpty()
+    + changeSettings(policy, buffer)
+  }
+}
+package repository {
+  interface UserAccountRepository
+  interface AuthSessionRepository
+  interface AuditLogRepository
+  interface StationSnapshotRepository
+}
+class RailwayStation
+interface StationListener
+
+AuthController --> AuthService
+TrainController --> TimetableService
+BookingController --> BookingService
+PnrController --> BookingService
+NotificationController --> NotificationService
+PlatformController --> OperationsService
+OperationsController --> OperationsService
+OperationsController --> DashboardService
+StaffReservationController --> StaffReservationService
+SimulationController --> SimulationService
+AuditController --> AuditService
+AdminController --> SimulationService
+TestLabController --> TestScenarioService
+
+AuthService --> UserAccountRepository
+AuthService --> AuthSessionRepository
+AuthService --> AuditService
+AuditService --> AuditLogRepository
+SimulationService --> StationSnapshotRepository
+TimetableService --> StationService
+BookingService --> StationService
+OperationsService --> StationService
+StaffReservationService --> StationService
+DashboardService --> StationService
+SimulationService --> StationService
+StationService --> RailwayStation
+NotificationService ..|> StationListener
+TestScenarioService ..> RailwayStation : own lab station
+@enduml

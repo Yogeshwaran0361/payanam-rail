@@ -1,0 +1,5 @@
+[
+  { "id": "P1", "name": "Platform 1", "lengthMeters": 600 },
+  { "id": "P2", "name": "Platform 2", "lengthMeters": 450 },
+  { "id": "P3", "name": "Platform 3", "lengthMeters": 300 }
+]

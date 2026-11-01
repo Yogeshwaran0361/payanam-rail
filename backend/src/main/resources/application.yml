@@ -1,0 +1,62 @@
+# Payanam Rail configuration. Every value can be overridden with an environment variable,
+# e.g. PAYANAM_STATION_ACCESS_CODE=... or SERVER_PORT=9090.
+server:
+  port: 8080
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: payanam-rail
+  # MySQL database: used for persistent user accounts, sign-in sessions, audit log and saved snapshots.
+  # Trains, PNRs, platforms and queues live in hand-written in-memory Java collections.
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/payanam_rail_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+payanam:
+  station:
+    name: Payanam Junction
+    # Staff can only register with this code.
+    access-code: PAYANAM-2026
+    # Platform occupation = [arrival, departure + clearance buffer)
+    clearance-buffer-minutes: 10
+    allocation-policy: BEST_FIT
+    # Simulation clock start on the service day (the service day is the day the server starts).
+    clock-start: "06:30"
+    # When the clock is "playing": every tick-seconds real seconds, add play-step-minutes.
+    tick-seconds: 2
+    play-step-minutes: 1
+  security:
+    # HMAC signing key (Base64, at least 256 bits; this 424-bit demo key gives HS384). CHANGE IT in production: PAYANAM_SECURITY_JWT_SECRET.
+    jwt-secret: "cGF5YW5hbS1yYWlsLWRlbW8tc2VjcmV0LWtleS1jaGFuZ2UtbWUtaW4tcHJvZHVjdGlvbiE="
+    jwt-expiry-minutes: 60
+    remember-me-days: 7
+    max-failed-attempts: 5
+    lockout-minutes: 15
+    otp-expiry-minutes: 10
+    staff-email-domain: payanam.in
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.payanam.rail: INFO

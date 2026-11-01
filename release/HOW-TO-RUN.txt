@@ -1,0 +1,20 @@
+PAYANAM RAIL - READY-TO-RUN BUILD
+=================================
+
+payanam-rail-1.0.0.jar already contains everything: the Spring Boot backend, all Java
+libraries, the H2 database driver and the built React frontend. No Maven, Node or npm needed.
+
+1. Install Java 17 or newer (check with:  java -version)
+2. Windows:      double-click start-windows.bat
+   Mac / Linux:  ./start-mac-linux.sh      (or:  java -jar payanam-rail-1.0.0.jar)
+3. Open http://localhost:8080   (Swagger API docs: http://localhost:8080/swagger-ui.html)
+
+Demo accounts
+  Passenger            passenger@payanam.in       Passenger@123
+  Station Master       stationmaster@payanam.in   Station@123
+  Platform Controller  controller@payanam.in      Station@123
+  Booking Clerk        clerk@payanam.in           Station@123
+
+Accounts are stored in a "data" folder created next to the jar. Delete it to reset accounts.
+Port 8080 busy?  java -jar payanam-rail-1.0.0.jar --server.port=9090
+To build from source instead, see ../README.md  (cd backend, then ./mvnw spring-boot:run).

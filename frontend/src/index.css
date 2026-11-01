@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Payanam Rail design system: reusable component classes built from Tailwind tokens. */
+@layer base {
+  html { @apply antialiased; }
+  body { @apply bg-slate-50 text-slate-800 dark:bg-navy-950 dark:text-slate-200; }
+  :focus-visible { @apply outline-none ring-2 ring-teal-500 ring-offset-2 ring-offset-white dark:ring-offset-navy-950; }
+  h1, h2, h3 { @apply text-navy-900 dark:text-white; }
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-slate-200/80 bg-white shadow-card dark:border-navy-800 dark:bg-navy-900; }
+  .card-pad { @apply p-5; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
+         disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-teal-500; }
+  .btn-primary { @apply btn bg-teal-600 text-white hover:bg-teal-700 shadow-sm; }
+  .btn-navy { @apply btn bg-navy-800 text-white hover:bg-navy-700 dark:bg-navy-700 dark:hover:bg-navy-600; }
+  .btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50
+         dark:border-navy-700 dark:bg-navy-900 dark:text-slate-200 dark:hover:bg-navy-800; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-navy-800; }
+  .btn-sm { @apply px-3 py-1.5 text-xs; }
+  .input { @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
+         placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30
+         dark:border-navy-700 dark:bg-navy-950 dark:text-slate-100; }
+  .input-error { @apply border-red-500 focus:border-red-500 focus:ring-red-500/30; }
+  .label { @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300; }
+  .field-error { @apply mt-1 text-xs text-red-600 dark:text-red-400; }
+  .muted { @apply text-slate-500 dark:text-slate-400; }
+  .table-head { @apply bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500
+         dark:bg-navy-950/60 dark:text-slate-400; }
+  .table-cell { @apply px-4 py-3 text-sm; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .nav-link { @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white; }
+  .nav-link-active { @apply bg-teal-500/15 text-teal-300; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+  .print-area { box-shadow: none !important; border: 1px solid #ddd !important; }
+}

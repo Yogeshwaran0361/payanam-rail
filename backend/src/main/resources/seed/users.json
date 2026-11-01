@@ -1,0 +1,165 @@
+{
+  "passengers": [
+    {
+      "fullName": "Arun Kumar",
+      "email": "passenger@payanam.in",
+      "mobile": "9876543210",
+      "dateOfBirth": "1995-04-12",
+      "gender": "MALE",
+      "city": "Chennai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Priya Raman",
+      "email": "priya.raman@example.in",
+      "mobile": "9840011001",
+      "dateOfBirth": "1992-07-21",
+      "gender": "FEMALE",
+      "city": "Chennai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Karthik Subramanian",
+      "email": "karthik.s@example.in",
+      "mobile": "9840011002",
+      "dateOfBirth": "1989-02-03",
+      "gender": "MALE",
+      "city": "Madurai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Divya Lakshmi",
+      "email": "divya.lakshmi@example.in",
+      "mobile": "9840011003",
+      "dateOfBirth": "1997-11-15",
+      "gender": "FEMALE",
+      "city": "Tiruchirappalli",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Senthil Murugan",
+      "email": "senthil.m@example.in",
+      "mobile": "9840011004",
+      "dateOfBirth": "1985-05-30",
+      "gender": "MALE",
+      "city": "Dindigul",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Meena Krishnan",
+      "email": "meena.k@example.in",
+      "mobile": "9840011005",
+      "dateOfBirth": "1990-09-09",
+      "gender": "FEMALE",
+      "city": "Chennai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Rahul Iyer",
+      "email": "rahul.iyer@example.in",
+      "mobile": "9840011006",
+      "dateOfBirth": "1999-01-25",
+      "gender": "MALE",
+      "city": "Coimbatore",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Anitha Selvam",
+      "email": "anitha.selvam@example.in",
+      "mobile": "9840011007",
+      "dateOfBirth": "1994-03-18",
+      "gender": "FEMALE",
+      "city": "Madurai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Vignesh Babu",
+      "email": "vignesh.babu@example.in",
+      "mobile": "9840011008",
+      "dateOfBirth": "1988-12-01",
+      "gender": "MALE",
+      "city": "Thoothukudi",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Lakshmi Narayanan",
+      "email": "lakshmi.n@example.in",
+      "mobile": "9840011009",
+      "dateOfBirth": "1979-06-14",
+      "gender": "FEMALE",
+      "city": "Tirunelveli",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Suresh Pandian",
+      "email": "suresh.pandian@example.in",
+      "mobile": "9840011010",
+      "dateOfBirth": "1983-08-08",
+      "gender": "MALE",
+      "city": "Madurai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Kavya Rajan",
+      "email": "kavya.rajan@example.in",
+      "mobile": "9840011011",
+      "dateOfBirth": "2001-10-10",
+      "gender": "FEMALE",
+      "city": "Chennai",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Harish Chandran",
+      "email": "harish.c@example.in",
+      "mobile": "9840011012",
+      "dateOfBirth": "1996-02-28",
+      "gender": "MALE",
+      "city": "Villupuram",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Revathi Mohan",
+      "email": "revathi.mohan@example.in",
+      "mobile": "9840011013",
+      "dateOfBirth": "1991-04-04",
+      "gender": "FEMALE",
+      "city": "Chengalpattu",
+      "password": "Passenger@123"
+    },
+    {
+      "fullName": "Manoj Kumar",
+      "email": "manoj.kumar@example.in",
+      "mobile": "9840011014",
+      "dateOfBirth": "1987-07-07",
+      "gender": "MALE",
+      "city": "Tiruchirappalli",
+      "password": "Passenger@123"
+    }
+  ],
+  "staff": [
+    {
+      "fullName": "Ramesh Sundaram",
+      "email": "stationmaster@payanam.in",
+      "mobile": "9940012001",
+      "employeeId": "PJ-EMP-1001",
+      "designation": "STATION_MASTER",
+      "password": "Station@123"
+    },
+    {
+      "fullName": "Nithya Venkat",
+      "email": "controller@payanam.in",
+      "mobile": "9940012002",
+      "employeeId": "PJ-EMP-1002",
+      "designation": "PLATFORM_CONTROLLER",
+      "password": "Station@123"
+    },
+    {
+      "fullName": "Bala Murali",
+      "email": "clerk@payanam.in",
+      "mobile": "9940012003",
+      "employeeId": "PJ-EMP-1003",
+      "designation": "BOOKING_CLERK",
+      "password": "Station@123"
+    }
+  ]
+}

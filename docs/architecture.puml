@@ -1,0 +1,283 @@
+' Payanam Rail – component and sequence diagrams (PlantUML)
+' Render: java -jar plantuml.jar (no Graphviz needed: class/component diagrams use the built-in smetana layout)
+'        e.g. java -jar plantuml.jar docs/architecture.puml
+' The same diagrams in Mermaid: architecture.md
+
+@startuml payanam-components
+!pragma layout smetana
+title Payanam Rail – component / architecture diagram
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+node "Browser" {
+  [React 18 SPA\n(TypeScript, Vite, Tailwind, Recharts)] as SPA
+  [Axios client\nJWT interceptor] as AX
+  database "localStorage\n(token, theme)" as LS
+  SPA --> AX
+  AX --> LS
+}
+
+node "Spring Boot 3 application (Java 17, :8080)" {
+  [Static resources\nindex.html + assets] as STATIC
+  [springdoc-openapi\n/swagger-ui.html] as SW
+  package "Spring Security" {
+    [JwtAuthenticationFilter] as JF
+    [@PreAuthorize\nROLE_* / PERM_*] as PA
+  }
+  package "controller (/api/v1)" {
+    [auth, trains, bookings, pnr] as C1
+    [platforms, operations, simulation] as C2
+    [audit, admin, tests] as C3
+  }
+  [GlobalExceptionHandler] as GEH
+  package "service" {
+    [AuthService, AuditService] as S1
+    [BookingService, TimetableService,\nNotificationService] as S2
+    [OperationsService, StaffReservationService,\nDashboardService, SimulationService] as S3
+    [TestScenarioService] as S4
+    [StationService\n(one lock, preview on a copy)] as SS
+  }
+  package "domain (plain Java)" {
+    [RailwayStation] as RS
+    [TrainRegistry\nHashMap + sorted ArrayList] as TR
+    [ReservationDesk\nHashMaps + sorted history] as RD
+    component "TrainService\nseats array (10) + ArrayDeque" as TS
+    [PlatformScheduler\nPriorityQueue + min-heap] as PS
+    [Platform\nsorted intervals] as PL
+    [PlatformAllocationPolicy\nBestFit / FirstFit] as POL
+  }
+  package "repository (Spring Data JPA)" {
+    [UserAccount, AuthSession,\nPasswordResetRequest] as R1
+    [AuditLogEntry, StationSnapshot] as R2
+  }
+  [seed/*.json loaders] as SEED
+}
+database "H2 file DB\naccounts, sessions,\naudit, snapshots ONLY" as H2
+
+AX --> JF : JSON + Bearer JWT
+SPA ..> STATIC : GET / , /assets
+JF --> PA
+PA --> C1
+PA --> C2
+PA --> C3
+C1 --> S1
+C1 --> S2
+C2 --> S3
+C3 --> S1
+C3 --> S3
+C3 --> S4
+C1 ..> GEH
+S2 --> SS
+S3 --> SS
+SS --> RS
+RS --> TR
+RS --> RD
+RS --> PS
+TR --> TS
+PS --> PL
+PS --> POL
+S1 --> R1
+S1 --> R2
+S3 --> R2
+R1 --> H2
+R2 --> H2
+SEED --> SS
+SEED --> R1
+@enduml
+
+@startuml seq-book
+title Book a ticket (R1, R2, R6)
+autonumber
+actor Passenger as P
+participant "BookTicket page" as UI
+participant BookingController as BC
+participant BookingService as BS
+participant StationService as SS
+participant ReservationDesk as RD
+participant TrainService as T
+participant AuditService as A
+
+P -> UI : choose train, 1–4 passengers, Confirm
+UI -> BC : POST /api/v1/bookings
+BC -> BC : @Valid BookingRequest
+BC -> BS : book(user, request)
+BS -> SS : write(station -> book(...))
+SS -> RD : book(ownerId, name, trainNo, people, now)
+RD -> RD : registry.get(trainNo) (HashMap O(1))\nelse TrainNotFoundException 404
+RD -> RD : new PNR, one Reservation per passenger
+loop each passenger
+  RD -> T : bookSeat(ticket, now)
+  alt train ARRIVED / DEPARTED (R6)
+    T --> RD : SeatUnavailableException (409)
+  else confirmed < 10 (R1)
+    T -> T : seats[lowestFreeSeat] = ticket\nconfirmedCount++
+    T --> RD : CNF/S n
+  else full
+    T -> T : waitingList.addLast(ticket)
+    T --> RD : WL/n
+  end
+end
+RD -> RD : bookingsByPnr.put, pnrsByOwner.add,\nhistory.insertSorted
+RD --> SS : Booking
+SS --> BS : BookingView
+BS -> A : record(BOOKING_CREATED)
+BS --> BC : BookingView
+BC --> UI : 201 Created
+UI --> P : PNR + status per passenger
+@enduml
+
+@startuml seq-cancel-promote
+title Cancel -> Promote (R3, R4, R5)
+autonumber
+actor "Passenger / Booking Clerk" as P
+participant "Booking / StaffReservation\nController" as BC
+participant "Booking / StaffReservation\nService" as BS
+participant StationService as SS
+participant ReservationDesk as RD
+participant TrainService as T
+participant NotificationService as N
+participant AuditService as A
+
+P -> BC : POST /bookings/{pnr}/cancel
+BC -> BS : cancel(user, pnr)
+BS -> SS : write(station -> cancelBooking(...))
+SS -> RD : cancelBooking(pnr, actor, staffOverride, now)
+RD -> RD : bookingsByPnr.get(pnr) else 404 PNR_NOT_FOUND
+RD -> RD : owner check else 403
+RD -> RD : active tickets? else 409 INVALID_CANCELLATION
+loop each active ticket
+  RD -> T : cancelBooking(ticket, now)
+  alt ticket was WL
+    T -> T : waitingList.remove(ticket)\nrenumber WL/1..n
+  else ticket was CNF/S k
+    T -> T : seats[k] = null, confirmedCount--
+    T -> T : promoted = waitingList.pollFirst()
+    opt somebody was waiting
+      T -> T : seats[k] = promoted, confirmedCount++\nWL/1 -> CNF/S k, renumber the rest
+    end
+  end
+  T --> RD : CancellationOutcome
+  opt promoted
+    RD -> N : onPromotion(PromotionNotice)
+    N -> N : notification "WL/1 -> CNF/S7" for the owner
+  end
+end
+RD --> BS : outcomes
+BS -> A : record(BOOKING_CANCELLED)
+BS --> P : 200 cancelledTickets, promotions
+@enduml
+
+@startuml seq-arrival-allocate
+title Arrival request -> Allocate (P1-P4, P6)
+autonumber
+actor "Platform Controller" as C
+participant OperationsService as OS
+participant StationService as SS
+participant PlatformScheduler as PS
+participant "PlatformAllocationPolicy\n(BestFit)" as POL
+participant Platform as PL
+queue "waitingQueue\n(PriorityQueue)" as Q
+queue "releaseHeap\n(min-heap)" as H
+
+C -> OS : POST /operations/arrival-requests {trainNo, type}
+OS -> SS : write(station -> requestPlatform)
+SS -> PS : requestPlatform(trainNo, type)
+alt longest platform < train length (P2)
+  PS --> OS : REJECTED "Overlong train – exceeds all platform lengths"
+else
+  PS -> PS : request = PlatformRequest.create(type, train)
+  PS -> POL : selectPlatform(train, [arr, dep + buffer), platforms)
+  loop each platform
+    POL -> PL : isAvailableForAllocation(), canFit(), isFree(start, end)
+  end
+  POL --> PS : shortest valid platform (tie -> lowest id) or empty
+  alt platform found (P1, P6)
+    PS -> PL : occupyPlatform(...)  re-checks P1
+    PS -> H : add(PlatformRelease(platform, train, end))
+    PS --> OS : ASSIGNED P#
+  else suitable platforms busy (P3)
+    PS -> Q : add(request)  rank -> arrival -> trainNo (P4)
+    PS -> H : walk a copy: next release of a long-enough platform
+    PS --> OS : QUEUED at position n
+  end
+end
+OS -> OS : audit ARRIVAL_REQUEST
+OS --> C : AllocationView
+@enduml
+
+@startuml seq-delay-reallocate
+title Delay -> Reallocate (P5, P7)
+autonumber
+actor "Platform Controller" as C
+participant "Train Operations\nmodal" as UI
+participant OperationsService as OS
+participant StationService as SS
+participant PlatformScheduler as PS
+participant Platform as PL
+queue waitingQueue as Q
+participant NotificationService as N
+
+C -> UI : delay 20 min, Preview impact
+UI -> OS : POST /trains/{no}/delay/preview
+OS -> SS : preview(...) on station.copy()
+SS --> UI : DelayImpact (nothing changed)
+C -> UI : Confirm
+UI -> OS : POST /trains/{no}/delay
+OS -> SS : write(station -> reportDelay)
+SS -> PS : reportDelay(trainNo, 20, reason)
+alt WAITING_FOR_PLATFORM
+  PS -> Q : remove(request)
+  PS -> PS : registry.delay(train)
+  PS -> Q : add(request)  reinserted at new rank
+else PLATFORM_ASSIGNED or ARRIVED
+  PS -> PL : removeOccupation(train)
+  PS -> PS : registry.delay(train)
+  PS -> PL : findOverlapping(newStart, newEnd)
+  alt clash with an arrived or earlier train (P5)
+    PS -> Q : delayed train gives up its platform, waits
+  else only later, not-yet-arrived trains clash
+    loop each later overlapping train
+      PS -> PL : removeOccupation(later)
+      PS -> Q : add(later)  un-assigned, re-queued, alert
+    end
+    PS -> PL : reoccupy(train, newStart, newEnd)
+  end
+end
+PS -> PS : processQueue()  poll in P4 order, tryAllocate
+PS --> SS : DelayImpact
+SS -> N : onTrainUpdate for affected PNR owners
+OS -> OS : audit DELAY_REPORTED
+OS --> C : 200 DelayImpact
+@enduml
+
+@startuml seq-signin
+title Sign in and an authorised request
+autonumber
+actor User as U
+participant AuthPage as UI
+participant AuthController as AC
+participant AuthService as AS
+database "H2\nUserAccount, AuthSession" as DB
+participant JwtAuthenticationFilter as F
+participant "any /api/v1 controller" as API
+
+U -> UI : email or mobile + password
+UI -> AC : POST /auth/signin
+AC -> AS : signIn(request)
+AS -> DB : findByEmail / findByMobile
+alt locked
+  AS --> UI : 423 ACCOUNT_LOCKED
+else wrong password
+  AS -> DB : failedLoginAttempts++ (5th -> locked 15 min)
+  AS --> UI : 401 AUTH_FAILED, n attempts left
+else correct
+  AS -> DB : save AuthSession(id = jti)
+  AS --> UI : 200 token, expiresAt, user
+end
+UI -> UI : store token, auto-logout timer
+UI -> F : GET /api/v1/... Bearer token
+F -> F : verify signature and expiry
+F -> DB : session active and not revoked?
+F -> API : authorities ROLE_* + PERM_*
+API -> API : @PreAuthorize else 403 FORBIDDEN
+@enduml

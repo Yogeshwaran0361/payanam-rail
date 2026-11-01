@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:payanam-test;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+payanam:
+  station:
+    tick-seconds: 3600
+logging:
+  level:
+    com.payanam.rail: WARN
